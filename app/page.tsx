@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
 export default function Home() {
@@ -56,20 +57,29 @@ export default function Home() {
         </button>
       ) : (
         <div className="text-center space-y-4">
-          <h1 className="text-2xl font-bold">
-            👋 Welcome!
+          <h1 className="text-3xl font-bold">
+            ⚽ World Cup Predictor
           </h1>
 
           <p className="text-gray-600">
-            {user.email}
+            Welcome {user.email}
           </p>
 
-          <button
-            onClick={logout}
-            className="border rounded px-4 py-2 hover:bg-gray-100"
+          <Link
+            href="/matches"
+            className="inline-block border rounded px-6 py-3 hover:bg-gray-100"
           >
-            Logout
-          </button>
+            View Matches
+          </Link>
+
+          <div>
+            <button
+              onClick={logout}
+              className="border rounded px-4 py-2 hover:bg-gray-100"
+            >
+              Logout
+            </button>
+          </div>
         </div>
       )}
     </main>
