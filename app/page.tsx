@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import Navbar from '@/app/components/Navbar'
 
 export default function Home() {
   const [user, setUser] = useState<any>(null)
@@ -47,6 +48,8 @@ export default function Home() {
   }
 
   return (
+    <>
+    <Navbar email={user?.email} />
     <main className="min-h-screen flex items-center justify-center">
       {!user ? (
         <button
@@ -83,5 +86,6 @@ export default function Home() {
         </div>
       )}
     </main>
+    </>
   )
 }
