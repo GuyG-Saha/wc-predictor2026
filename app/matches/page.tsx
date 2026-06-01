@@ -63,40 +63,57 @@ export default function MatchesPage() {
     <>
     <Navbar />
     <main className="min-h-screen p-8 max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6">
+      <h1 className="text-4xl font-bold mb-8">
         World Cup 2026 Matches
       </h1>
 
       <div className="space-y-4">
         {matches.map((match) => (
           <div
-            key={match.id}
-            className="border rounded p-4 flex justify-between items-center"
-          >
-            <div>
-              <div className="font-semibold text-lg">
-                {teams[match.home_team_id]} vs{' '}
-                {teams[match.away_team_id]}
-              </div>
+  key={match.id}
+  className="border rounded-lg p-5 shadow-sm hover:shadow-md transition bg-white"
+>
+  <div className="flex justify-between items-center mb-3">
 
-              <div className="text-sm text-gray-500">
-                {new Date(match.start_time).toLocaleString()}
-              </div>
+    <div className="flex-1 text-right font-semibold text-lg">
+      {teams[match.home_team_id]}
+    </div>
 
-              <div className="text-sm text-gray-500">
-                {match.stage}
-                {match.group_name
-                  ? ` - ${match.group_name}`
-                  : ''}
-              </div>
-            </div>
+    <div className="px-4 text-gray-400 font-bold">
+      VS
+    </div>
 
-            <div className="text-xl font-bold">
-              {match.is_finished
-                ? `${match.home_score} - ${match.away_score}`
-                : 'VS'}
-            </div>
-          </div>
+    <div className="flex-1 font-semibold text-lg">
+      {teams[match.away_team_id]}
+    </div>
+
+  </div>
+
+  <div className="text-center text-sm text-gray-500 mb-3">
+    {match.stage}
+    {match.group_name
+      ? ` • ${match.group_name}`
+      : ''}
+  </div>
+
+  <div className="flex justify-between items-center">
+
+    <div className="text-xs text-gray-400">
+      {new Date(match.start_time).toLocaleString()}
+    </div>
+
+    {match.is_finished ? (
+      <div className="text-lg font-bold">
+        {match.home_score} - {match.away_score}
+      </div>
+    ) : (
+      <button className="border px-3 py-1 rounded hover:bg-gray-100 text-sm">
+        Predict
+      </button>
+    )}
+
+  </div>
+</div>
         ))}
       </div>
     </main>
