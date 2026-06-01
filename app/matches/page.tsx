@@ -2,57 +2,68 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import Navbar from '../components/Navbar'
 import { TOURNAMENT_ID } from '@/lib/constants'
-
+import Navbar from '../components/Navbar'
 
 type Team = {
   id: string
   name: string
+  code: string
 }
 
 type Match = {
   id: string
-  home_team_id: string
-  away_team_id: string
   start_time: string
   stage: string
   group_name: string | null
   is_finished: boolean
   home_score: number | null
   away_score: number | null
+  home_team: Team
+  away_team: Team
 }
+
+const formatStage = (stage: string) =>
+  stage.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+
+const formatKickoff = (utcString: string) =>
+  new Date(utcString + 'Z').toLocaleString('he-IL', {
+    timeZone: 'Asia/Jerusalem',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 
 export default function MatchesPage() {
   const [matches, setMatches] = useState<Match[]>([])
-  const [teams, setTeams] = useState<Record<string, string>>({})
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const loadData = async () => {
-      const { data: teamsData } = await supabase
-        .from('teams')
-        .select('id, name')
-
-      const teamMap: Record<string, string> = {}
-
-      teamsData?.forEach((team: Team) => {
-        teamMap[team.id] = team.name
-      })
-
-      setTeams(teamMap)
-
-      const { data: matchesData, error } = await supabase
+      const { data, error } = await supabase
         .from('matches')
-        .select('*')
+        .select(`
+          id,
+          start_time,
+          stage,
+          group_name,
+          is_finished,
+          home_score,
+          away_score,
+          home_team:teams!home_team_id(id, name, code),
+          away_team:teams!away_team_id(id, name, code)
+        `)
         .eq('tournament_id', TOURNAMENT_ID)
         .order('start_time', { ascending: true })
 
       if (error) {
         console.error(error)
-        return
+      } else {
+        setMatches((data as unknown as Match[]) || [])
       }
-
-      setMatches(matchesData || [])
+      setLoading(false)
     }
 
     loadData()
@@ -60,62 +71,62 @@ export default function MatchesPage() {
 
   return (
     <>
-    <Navbar />
-    <main className="min-h-screen p-8 max-w-4xl mx-auto">
-      <h1 className="text-4xl font-bold mb-8">
-        World Cup 2026 Matches
-      </h1>
+      <Navbar />
+      <main className="min-h-screen p-4 md:p-8 max-w-4xl mx-auto">
+        <h1 className="text-3xl md:text-4xl font-bold mb-6">
+          World Cup 2026 Matches
+        </h1>
 
-      <div className="space-y-4">
-        {matches.map((match) => (
-          <div
-  key={match.id}
-  className="border rounded-lg p-5 shadow-sm hover:shadow-md transition bg-white"
->
-  <div className="flex justify-between items-center mb-3">
+        {loading ? (
+          <div className="flex justify-center items-center py-20">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900" />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {matches.map((match) => (
+              <div
+                key={match.id}
+                className="border rounded-lg p-4 shadow-sm hover:shadow-md transition bg-white"
+              >
+                {/* Teams row */}
+                <div className="flex justify-between items-center mb-2">
+                  <div className="flex-1 text-right font-semibold text-base md:text-lg">
+                    {match.home_team.name}
+                  </div>
+                  <div className="px-3 text-gray-400 font-bold text-sm">
+                    VS
+                  </div>
+                  <div className="flex-1 font-semibold text-base md:text-lg">
+                    {match.away_team.name}
+                  </div>
+                </div>
 
-    <div className="flex-1 text-right font-semibold text-lg">
-      {teams[match.home_team_id]}
-    </div>
+                {/* Stage + group */}
+                <div className="text-center text-xs text-gray-500 mb-3">
+                  {formatStage(match.stage)}
+                  {match.group_name ? ` • Group ${match.group_name}` : ''}
+                </div>
 
-    <div className="px-4 text-gray-400 font-bold">
-      VS
-    </div>
-
-    <div className="flex-1 font-semibold text-lg">
-      {teams[match.away_team_id]}
-    </div>
-
-  </div>
-
-  <div className="text-center text-sm text-gray-500 mb-3">
-    {match.stage}
-    {match.group_name
-      ? ` • ${match.group_name}`
-      : ''}
-  </div>
-
-  <div className="flex justify-between items-center">
-
-    <div className="text-xs text-gray-400">
-      {new Date(match.start_time).toLocaleString()}
-    </div>
-
-    {match.is_finished ? (
-      <div className="text-lg font-bold">
-        {match.home_score} - {match.away_score}
-      </div>
-    ) : (
-      <button className="border px-3 py-1 rounded hover:bg-gray-100 text-sm">
-        Predict
-      </button>
-    )}
-
-  </div>
-</div>
-        ))}
-      </div>
-    </main>
+                {/* Kickoff + score/predict */}
+                <div className="flex justify-between items-center">
+                  <div className="text-xs text-gray-400">
+                    {formatKickoff(match.start_time)}
+                  </div>
+                  {match.is_finished ? (
+                    <div className="text-lg font-bold">
+                      {match.home_score} – {match.away_score}
+                    </div>
+                  ) : (
+                    <button className="border px-3 py-1 rounded hover:bg-gray-100 text-sm transition">
+                      Predict
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
     </>
   )
 }
