@@ -1,0 +1,1 @@
+export const TOURNAMENT_ID = 'aaaaaaaa-0000-0000-0000-000000000001'

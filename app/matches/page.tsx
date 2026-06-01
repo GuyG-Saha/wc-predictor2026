@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Navbar from '../components/Navbar'
+import { TOURNAMENT_ID } from '@/lib/constants'
+
 
 type Team = {
   id: string
@@ -20,9 +22,6 @@ type Match = {
   home_score: number | null
   away_score: number | null
 }
-
-const WORLD_CUP_ID =
-  'aaaaaaaa-0000-0000-0000-000000000001'
 
 export default function MatchesPage() {
   const [matches, setMatches] = useState<Match[]>([])
@@ -45,7 +44,7 @@ export default function MatchesPage() {
       const { data: matchesData, error } = await supabase
         .from('matches')
         .select('*')
-        .eq('tournament_id', WORLD_CUP_ID)
+        .eq('tournament_id', TOURNAMENT_ID)
         .order('start_time', { ascending: true })
 
       if (error) {
