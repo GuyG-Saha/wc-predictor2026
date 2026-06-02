@@ -29,6 +29,10 @@ export default function Navbar({ email }: NavbarProps) {
             Matches
           </Link>
 
+          <Link href="/leaderboard" className="hover:underline">
+            Leaderboard
+          </Link>
+
           {email && (
             <span className="text-sm text-gray-500">
               {email}
