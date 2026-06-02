@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { TOURNAMENT_ID } from '@/lib/constants'
 import Navbar from '../components/Navbar'
+import PredictionModal from '../components/PredictionModal'
 
 type Team = {
   id: string
@@ -23,6 +24,11 @@ type Match = {
   away_team: Team
 }
 
+type UserPrediction = {
+  home: number
+  away: number
+}
+
 const formatStage = (stage: string) =>
   stage.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 
@@ -39,6 +45,8 @@ const formatKickoff = (utcString: string) =>
 export default function MatchesPage() {
   const [matches, setMatches] = useState<Match[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
+  const [predictions, setPredictions] = useState<Record<string, UserPrediction>>({})
 
   useEffect(() => {
     const loadData = async () => {
@@ -69,9 +77,20 @@ export default function MatchesPage() {
     loadData()
   }, [])
 
+  const handlePredictionSaved = (matchId: string, home: number, away: number) => {
+    setPredictions((prev) => ({ ...prev, [matchId]: { home, away } }))
+  }
+
   return (
     <>
       <Navbar />
+      {selectedMatch && (
+        <PredictionModal
+          match={selectedMatch}
+          onClose={() => setSelectedMatch(null)}
+          onSaved={handlePredictionSaved}
+        />
+      )}
       <main className="min-h-screen p-4 md:p-8 max-w-4xl mx-auto">
         <h1 className="text-3xl md:text-4xl font-bold mb-6">
           World Cup 2026 Matches
@@ -116,8 +135,18 @@ export default function MatchesPage() {
                     <div className="text-lg font-bold">
                       {match.home_score} – {match.away_score}
                     </div>
+                  ) : predictions[match.id] ? (
+                    <button
+                      onClick={() => setSelectedMatch(match)}
+                      className="border border-blue-400 text-blue-600 px-3 py-1 rounded hover:bg-blue-50 text-sm font-medium transition"
+                    >
+                      {predictions[match.id].home} – {predictions[match.id].away} ✓
+                    </button>
                   ) : (
-                    <button className="border px-3 py-1 rounded hover:bg-gray-100 text-sm transition">
+                    <button
+                      onClick={() => setSelectedMatch(match)}
+                      className="border px-3 py-1 rounded hover:bg-gray-100 text-sm transition"
+                    >
                       Predict
                     </button>
                   )}
