@@ -5,42 +5,8 @@ import { supabase } from '@/lib/supabase'
 import { TOURNAMENT_ID } from '@/lib/constants'
 import Navbar from '../components/Navbar'
 import PredictionModal from '../components/PredictionModal'
-
-type Team = {
-  id: string
-  name: string
-  code: string
-}
-
-type Match = {
-  id: string
-  start_time: string
-  stage: string
-  group_name: string | null
-  is_finished: boolean
-  home_score: number | null
-  away_score: number | null
-  home_team: Team
-  away_team: Team
-}
-
-type UserPrediction = {
-  home: number
-  away: number
-}
-
-const formatStage = (stage: string) =>
-  stage.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-
-const formatKickoff = (utcString: string) =>
-  new Date(utcString + 'Z').toLocaleString('he-IL', {
-    timeZone: 'Asia/Jerusalem',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+import { Match, UserPrediction } from '@/lib/types'
+import { formatStage, formatKickoff } from '@/lib/utils'
 
 export default function MatchesPage() {
   const [matches, setMatches] = useState<Match[]>([])

@@ -2,40 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-
-type Team = {
-  id: string
-  name: string
-  code: string
-}
-
-type Match = {
-  id: string
-  start_time: string
-  stage: string
-  group_name: string | null
-  home_team: Team
-  away_team: Team
-}
+import { Match } from '@/lib/types'
+import { formatStage, formatKickoff } from '@/lib/utils'
 
 type Props = {
   match: Match
   onClose: () => void
   onSaved: (matchId: string, homeScore: number, awayScore: number) => void
 }
-
-const formatStage = (stage: string) =>
-  stage.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-
-const formatKickoff = (utcString: string) =>
-  new Date(utcString + 'Z').toLocaleString('he-IL', {
-    timeZone: 'Asia/Jerusalem',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 
 export default function PredictionModal({ match, onClose, onSaved }: Props) {
   const [homeScore, setHomeScore] = useState<number>(0)
