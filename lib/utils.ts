@@ -10,3 +10,12 @@ export const formatKickoff = (utcString: string) =>
     hour: '2-digit',
     minute: '2-digit',
   })
+
+export const formatMatchDay = (utcString: string) =>
+  new Date(utcString + 'Z').toLocaleDateString('he-IL', {
+    timeZone: 'Asia/Jerusalem',
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
