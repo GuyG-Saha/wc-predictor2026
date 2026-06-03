@@ -33,6 +33,10 @@ export default function Navbar({ email }: NavbarProps) {
             Leaderboard
           </Link>
 
+          <Link href="/admin" className="hover:underline">
+            Admin
+          </Link>
+
           {email && (
             <span className="text-sm text-gray-500">
               {email}
