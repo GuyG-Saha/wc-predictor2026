@@ -22,19 +22,26 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  console.log('[middleware] path:', request.nextUrl.pathname)
+  console.log('[middleware] auth user:', user?.id ?? null, '| error:', authError?.message ?? null)
 
   if (!user) {
+    console.log('[middleware] no user — redirecting to /')
     return NextResponse.redirect(new URL('/', request.url))
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('users')
     .select('role')
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'admin') {
+  console.log('[middleware] profile:', profile, '| error:', profileError?.message ?? null)
+
+  if (profileError || profile?.role !== 'admin') {
+    console.log('[middleware] not admin — redirecting to /. role:', profile?.role ?? 'null')
     return NextResponse.redirect(new URL('/', request.url))
   }
 
