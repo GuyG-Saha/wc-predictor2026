@@ -72,11 +72,12 @@ export default function MatchResultsTab() {
     const homeScore = row.editHome === '' ? null : Number(row.editHome)
     const awayScore = row.editAway === '' ? null : Number(row.editAway)
 
-    let winnerTeamId: string | null = null
-    if (row.editFinished && row.stage !== 'group' && homeScore !== null && awayScore !== null) {
-      if (homeScore > awayScore) winnerTeamId = row.home_team.id
-      else if (awayScore > homeScore) winnerTeamId = row.away_team.id
-    }
+  let winnerTeamId: string | null = null
+  if (homeScore !== null && awayScore !== null && row.stage !== 'group') {
+    if (homeScore > awayScore) winnerTeamId = row.home_team.id
+    else if (awayScore > homeScore) winnerTeamId = row.away_team.id
+  // draw stays null
+  }
 
     const { error } = await supabase
       .from('matches')
