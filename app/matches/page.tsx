@@ -177,7 +177,7 @@ export default function MatchesPage() {
                     VS
                   </div>
                   <div className="flex-1 font-semibold text-base md:text-lg">
-                    {match.away_team.name}
+                    {getFlag(match.away_team.code)} {match.away_team.name}
                   </div>
                 </div>
 
