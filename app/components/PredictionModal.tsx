@@ -4,11 +4,48 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Match } from '@/lib/types'
 import { formatStage, formatKickoff } from '@/lib/utils'
+import { getFlag } from '@/lib/flags'
 
 type Props = {
   match: Match
   onClose: () => void
   onSaved: (matchId: string, homeScore: number, awayScore: number) => void
+}
+
+function ScoreStepper({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: number
+  onChange: (v: number) => void
+  disabled?: boolean
+}) {
+  return (
+    <div className="flex items-center gap-4">
+      <button
+        type="button"
+        onClick={() => onChange(Math.max(0, value - 1))}
+        disabled={disabled}
+        className="w-10 h-10 rounded-full border-2 text-xl font-bold
+          hover:bg-gray-100 transition active:scale-95
+          disabled:opacity-30 disabled:cursor-not-allowed"
+      >
+        −
+      </button>
+      <span className="text-3xl font-bold w-8 text-center">{value}</span>
+      <button
+        type="button"
+        onClick={() => onChange(value + 1)}
+        disabled={disabled}
+        className="w-10 h-10 rounded-full border-2 text-xl font-bold
+          hover:bg-gray-100 transition active:scale-95
+          disabled:opacity-30 disabled:cursor-not-allowed"
+      >
+        +
+      </button>
+    </div>
+  )
 }
 
 export default function PredictionModal({ match, onClose, onSaved }: Props) {
@@ -42,7 +79,6 @@ export default function PredictionModal({ match, onClose, onSaved }: Props) {
     fetchExisting()
   }, [match.id])
 
-  // Close on Escape key
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', handleKey)
@@ -110,47 +146,39 @@ export default function PredictionModal({ match, onClose, onSaved }: Props) {
           </button>
         </div>
 
-        {/* Teams + score inputs */}
+        {/* Teams + steppers */}
         {loading ? (
           <div className="flex justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-center gap-4 my-6">
+            <div className="flex items-center justify-center gap-2 my-6">
               {/* Home team */}
-              <div className="flex flex-col items-center gap-2 flex-1">
+              <div className="flex flex-col items-center gap-3 flex-1">
+                <span className="text-2xl">{getFlag(match.home_team.code)}</span>
                 <span className="text-sm font-semibold text-center leading-tight">
                   {match.home_team.name}
                 </span>
-                <input
-                  type="number"
-                  min={0}
+                <ScoreStepper
                   value={homeScore}
-                  onChange={(e) => setHomeScore(Math.max(0, parseInt(e.target.value) || 0))}
+                  onChange={setHomeScore}
                   disabled={isLocked}
-                  className="w-20 h-16 text-3xl font-bold text-center border-2 rounded-xl
-                    focus:outline-none focus:border-blue-500 disabled:bg-gray-100
-                    disabled:text-gray-400 disabled:cursor-not-allowed"
                 />
               </div>
 
-              <span className="text-2xl font-bold text-gray-300 mb-[-24px]">—</span>
+              <span className="text-2xl font-bold text-gray-300 pb-2">—</span>
 
               {/* Away team */}
-              <div className="flex flex-col items-center gap-2 flex-1">
+              <div className="flex flex-col items-center gap-3 flex-1">
+                <span className="text-2xl">{getFlag(match.away_team.code)}</span>
                 <span className="text-sm font-semibold text-center leading-tight">
                   {match.away_team.name}
                 </span>
-                <input
-                  type="number"
-                  min={0}
+                <ScoreStepper
                   value={awayScore}
-                  onChange={(e) => setAwayScore(Math.max(0, parseInt(e.target.value) || 0))}
+                  onChange={setAwayScore}
                   disabled={isLocked}
-                  className="w-20 h-16 text-3xl font-bold text-center border-2 rounded-xl
-                    focus:outline-none focus:border-blue-500 disabled:bg-gray-100
-                    disabled:text-gray-400 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
