@@ -7,6 +7,7 @@ import Navbar from '../components/Navbar'
 import PredictionModal from '../components/PredictionModal'
 import { Match, UserPrediction } from '@/lib/types'
 import { formatStage, formatKickoff } from '@/lib/utils'
+import { getFlag } from '@/lib/flags'
 
 type Tab = 'upcoming' | 'finished' | 'all'
 
@@ -171,8 +172,7 @@ export default function MatchesPage() {
                 {/* Teams row */}
                 <div className="flex justify-between items-center mb-2">
                   <div className="flex-1 text-right font-semibold text-base md:text-lg">
-                    {match.home_team.name}
-                  </div>
+                     {getFlag(match.home_team.code)} {match.home_team.name}                  </div>
                   <div className="px-3 text-gray-400 font-bold text-sm">
                     VS
                   </div>
