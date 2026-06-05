@@ -43,6 +43,62 @@ function TabButton({
   )
 }
 
+// Derives current stage and matchday from all matches
+function getTournamentContext(matches: Match[]): string | null {
+  if (matches.length === 0) return null
+
+  const now = new Date()
+
+  // Find matches that have started (past kickoff) — these define current stage
+  const startedMatches = matches.filter(
+    (m) => new Date(m.start_time + 'Z') <= now
+  )
+
+  if (startedMatches.length === 0) {
+    // Tournament hasn't started yet
+    const first = matches[0]
+    const kickoff = new Date(first.start_time + 'Z').toLocaleDateString('he-IL', {
+      timeZone: 'Asia/Jerusalem',
+      day: '2-digit',
+      month: '2-digit',
+    })
+    return `⏳ Tournament starts ${kickoff}`
+  }
+
+  // Get the most recent started match to determine current stage
+  const latest = startedMatches[startedMatches.length - 1]
+  const stage = formatStage(latest.stage)
+
+  // For group stage, calculate matchday
+  if (latest.stage === 'group') {
+    // Group matchdays: each unique date batch of group matches
+    const groupMatches = matches.filter((m) => m.stage === 'group')
+    const uniqueDates = [
+      ...new Set(
+        groupMatches.map((m) =>
+          new Date(m.start_time + 'Z').toISOString().split('T')[0]
+        )
+      ),
+    ].sort()
+
+    const startedDates = uniqueDates.filter(
+      (d) => new Date(d + 'T00:00:00Z') <= now
+    )
+
+    // Matchday is determined by which third of group matches we're in
+    const matchday =
+      startedDates.length <= uniqueDates.length / 3
+        ? 1
+        : startedDates.length <= (uniqueDates.length * 2) / 3
+        ? 2
+        : 3
+
+    return `📍 ${stage} • Matchday ${matchday}`
+  }
+
+  return `📍 ${stage}`
+}
+
 export default function MatchesPage() {
   const [matches, setMatches] = useState<Match[]>([])
   const [predictions, setPredictions] = useState<Record<string, UserPrediction>>({})
@@ -52,7 +108,6 @@ export default function MatchesPage() {
 
   useEffect(() => {
     const loadData = async () => {
-      // Fetch matches
       const { data: matchesData, error } = await supabase
         .from('matches')
         .select(`
@@ -77,7 +132,6 @@ export default function MatchesPage() {
 
       setMatches((matchesData as unknown as Match[]) || [])
 
-      // Fetch existing predictions for logged-in user
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const { data: predictionsData } = await supabase
@@ -105,7 +159,6 @@ export default function MatchesPage() {
     setPredictions((prev) => ({ ...prev, [matchId]: { home, away } }))
   }
 
-  // Tab filtering
   const upcomingMatches = matches.filter((m) => !m.is_finished)
   const finishedMatches = matches.filter((m) => m.is_finished)
   const visibleMatches =
@@ -114,6 +167,8 @@ export default function MatchesPage() {
       : activeTab === 'finished'
       ? finishedMatches
       : matches
+
+  const tournamentContext = getTournamentContext(matches)
 
   return (
     <>
@@ -126,9 +181,17 @@ export default function MatchesPage() {
         />
       )}
       <main className="min-h-screen p-4 md:p-8 max-w-4xl mx-auto">
-        <h1 className="text-3xl md:text-4xl font-bold mb-6">
-          World Cup 2026 Matches
-        </h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl md:text-4xl font-bold">
+            World Cup 2026
+          </h1>
+          {/* Tournament context banner */}
+          {!loading && tournamentContext && (
+            <span className="text-xs font-medium bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-full whitespace-nowrap">
+              {tournamentContext}
+            </span>
+          )}
+        </div>
 
         {/* Tabs */}
         <div className="flex gap-1 bg-gray-50 border rounded-xl p-1 mb-5">
@@ -172,7 +235,8 @@ export default function MatchesPage() {
                 {/* Teams row */}
                 <div className="flex justify-between items-center mb-2">
                   <div className="flex-1 text-right font-semibold text-base md:text-lg">
-                     {getFlag(match.home_team.code)} {match.home_team.name}                  </div>
+                    {getFlag(match.home_team.code)} {match.home_team.name}
+                  </div>
                   <div className="px-3 text-gray-400 font-bold text-sm">
                     VS
                   </div>
