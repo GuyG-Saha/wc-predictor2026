@@ -22,6 +22,11 @@ type Tournament = {
   bonus_deadline: string | null
 }
 
+type Group = {
+  id: string
+  name: string
+}
+
 export default function Home() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -41,6 +46,13 @@ export default function Home() {
   const [bonusError, setBonusError] = useState<string | null>(null)
   const [bonusLoading, setBonusLoading] = useState(true)
 
+  // Group join state
+  const [userGroups, setUserGroups] = useState<Group[]>([])
+  const [inviteCode, setInviteCode] = useState('')
+  const [joining, setJoining] = useState(false)
+  const [joinError, setJoinError] = useState<string | null>(null)
+  const [joinSuccess, setJoinSuccess] = useState<string | null>(null)
+
   useEffect(() => {
     const getUser = async () => {
       const { data } = await supabase.auth.getUser()
@@ -58,50 +70,59 @@ export default function Home() {
 
   useEffect(() => {
     if (!user) return
+    loadBonusData()
+    loadUserGroups()
+  }, [user])
 
-    const loadBonusData = async () => {
-      setBonusLoading(true)
+  const loadUserGroups = async () => {
+    const { data } = await supabase
+      .from('group_members')
+      .select('group_id, groups(id, name)')
+      .eq('user_id', user.id)
 
-      // Load teams, tournament and existing bonus prediction in parallel
-      const [
-        { data: teamsData },
-        { data: tournamentData },
-        { data: bonusData },
-      ] = await Promise.all([
-        supabase.from('teams').select('id, name, code').order('name'),
-        supabase
-          .from('tournaments')
-          .select('bonus_deadline')
-          .eq('id', TOURNAMENT_ID)
-          .single(),
-        supabase
-          .from('bonus_predictions')
-          .select('predicted_winner_team_id, predicted_top_scorer')
-          .eq('user_id', user.id)
-          .maybeSingle(),
-      ])
+    if (data) {
+      const groups = data.map((row: any) => row.groups).filter(Boolean) as Group[]
+      setUserGroups(groups)
+    }
+  }
 
-      setTeams(teamsData || [])
-      setTournament(tournamentData)
+  const loadBonusData = async () => {
+    setBonusLoading(true)
+    const [
+      { data: teamsData },
+      { data: tournamentData },
+      { data: bonusData },
+    ] = await Promise.all([
+      supabase.from('teams').select('id, name, code').order('name'),
+      supabase
+        .from('tournaments')
+        .select('bonus_deadline')
+        .eq('id', TOURNAMENT_ID)
+        .single(),
+      supabase
+        .from('bonus_predictions')
+        .select('predicted_winner_team_id, predicted_top_scorer')
+        .eq('user_id', user.id)
+        .maybeSingle(),
+    ])
 
-      if (bonusData) {
-        setBonus(bonusData)
-        if (bonusData.predicted_winner_team_id && teamsData) {
-          const team = teamsData.find(
-            (t: Team) => t.id === bonusData.predicted_winner_team_id
-          )
-          if (team) {
-            setSelectedTeam(team)
-            setTeamSearch(team.name)
-          }
+    setTeams(teamsData || [])
+    setTournament(tournamentData)
+
+    if (bonusData) {
+      setBonus(bonusData)
+      if (bonusData.predicted_winner_team_id && teamsData) {
+        const team = teamsData.find(
+          (t: Team) => t.id === bonusData.predicted_winner_team_id
+        )
+        if (team) {
+          setSelectedTeam(team)
+          setTeamSearch(team.name)
         }
       }
-
-      setBonusLoading(false)
     }
-
-    loadBonusData()
-  }, [user])
+    setBonusLoading(false)
+  }
 
   const login = async () => {
     await supabase.auth.signInWithOAuth({ provider: 'google' })
@@ -150,6 +171,50 @@ export default function Home() {
       setTimeout(() => setBonusSaved(false), 3000)
     }
     setBonusSaving(false)
+  }
+
+  const handleJoinGroup = async () => {
+    if (!inviteCode.trim()) return
+    setJoining(true)
+    setJoinError(null)
+    setJoinSuccess(null)
+
+    // Look up group by invite code
+    const { data: group, error: groupError } = await supabase
+      .from('groups')
+      .select('id, name')
+      .eq('invite_code', inviteCode.trim().toUpperCase())
+      .eq('tournament_id', TOURNAMENT_ID)
+      .maybeSingle()
+
+    if (groupError || !group) {
+      setJoinError('Invalid invite code. Please check and try again.')
+      setJoining(false)
+      return
+    }
+
+    // Check if already a member
+    const alreadyMember = userGroups.some((g) => g.id === group.id)
+    if (alreadyMember) {
+      setJoinError(`You are already in the "${group.name}" group.`)
+      setJoining(false)
+      return
+    }
+
+    // Join the group
+    const { error: joinError } = await supabase
+      .from('group_members')
+      .insert({ group_id: group.id, user_id: user.id })
+
+    if (joinError) {
+      setJoinError('Failed to join group. Please try again.')
+    } else {
+      setJoinSuccess(`You joined "${group.name}" successfully! 🎉`)
+      setInviteCode('')
+      await loadUserGroups()
+      setTimeout(() => setJoinSuccess(null), 4000)
+    }
+    setJoining(false)
   }
 
   if (loading) {
@@ -212,6 +277,57 @@ export default function Home() {
                 <div className="font-semibold text-sm">Leaderboard</div>
                 <div className="text-xs text-gray-400 mt-0.5">See standings</div>
               </Link>
+            </div>
+
+            {/* Groups */}
+            <div className="border rounded-xl p-5">
+              <h2 className="font-bold text-lg mb-1">Your Groups</h2>
+
+              {/* Current groups */}
+              {userGroups.length > 0 ? (
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {userGroups.map((g) => (
+                    <span
+                      key={g.id}
+                      className="text-xs font-medium bg-green-50 text-green-700 border border-green-200 px-3 py-1 rounded-full"
+                    >
+                      {g.name}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 mb-4">
+                  You are not in any group yet. Enter an invite code to join one.
+                </p>
+              )}
+
+              {/* Join group */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => e.key === 'Enter' && handleJoinGroup()}
+                  placeholder="Enter invite code…"
+                  className="flex-1 border rounded-lg px-3 py-2 text-sm font-mono uppercase
+                    focus:outline-none focus:border-blue-500"
+                />
+                <button
+                  onClick={handleJoinGroup}
+                  disabled={joining || !inviteCode.trim()}
+                  className="bg-black text-white text-sm font-medium px-4 py-2 rounded-lg
+                    hover:bg-gray-800 transition disabled:opacity-50 whitespace-nowrap"
+                >
+                  {joining ? 'Joining…' : 'Join'}
+                </button>
+              </div>
+
+              {joinError && (
+                <p className="text-red-500 text-xs mt-2">{joinError}</p>
+              )}
+              {joinSuccess && (
+                <p className="text-green-600 text-xs mt-2">{joinSuccess}</p>
+              )}
             </div>
 
             {/* Bonus Predictions */}

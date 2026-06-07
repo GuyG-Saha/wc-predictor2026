@@ -4,11 +4,18 @@ import { useState } from 'react'
 import Navbar from '@/app/components/Navbar'
 import MatchResultsTab from './_components/MatchResultsTab'
 import UsersTab from './_components/UsersTab'
+import GroupsTab from './_components/GroupsTab'
 
-type Tab = 'matches' | 'users'
+type Tab = 'matches' | 'users' | 'groups'
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<Tab>('matches')
+
+  const tabs: { key: Tab; label: string }[] = [
+    { key: 'matches', label: 'Match Results' },
+    { key: 'users', label: 'Users' },
+    { key: 'groups', label: 'Groups' },
+  ]
 
   return (
     <>
@@ -23,29 +30,24 @@ export default function AdminPage() {
 
         {/* Tabs */}
         <div className="flex gap-1 bg-gray-50 border rounded-xl p-1 mb-6 w-fit">
-          <button
-            onClick={() => setActiveTab('matches')}
-            className={`px-5 py-2 text-sm font-medium rounded-lg transition ${
-              activeTab === 'matches'
-                ? 'bg-black text-white'
-                : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'
-            }`}
-          >
-            Match Results
-          </button>
-          <button
-            onClick={() => setActiveTab('users')}
-            className={`px-5 py-2 text-sm font-medium rounded-lg transition ${
-              activeTab === 'users'
-                ? 'bg-black text-white'
-                : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'
-            }`}
-          >
-            Users
-          </button>
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-5 py-2 text-sm font-medium rounded-lg transition ${
+                activeTab === tab.key
+                  ? 'bg-black text-white'
+                  : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        {activeTab === 'matches' ? <MatchResultsTab /> : <UsersTab />}
+        {activeTab === 'matches' && <MatchResultsTab />}
+        {activeTab === 'users' && <UsersTab />}
+        {activeTab === 'groups' && <GroupsTab />}
       </main>
     </>
   )
