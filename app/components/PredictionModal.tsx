@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Match } from '@/lib/types'
 import { formatStage, formatKickoff } from '@/lib/utils'
-import { getFlag } from '@/lib/flags'
+import FlagImage from '@/app/components/FlagImage'
+
 
 type Props = {
   match: Match
@@ -156,7 +157,9 @@ export default function PredictionModal({ match, onClose, onSaved }: Props) {
             <div className="flex items-center justify-center gap-2 my-6">
               {/* Home team */}
               <div className="flex flex-col items-center gap-3 flex-1">
-                <span className="text-2xl">{getFlag(match.home_team.code)}</span>
+                <span className="text-2xl">
+                  <FlagImage code={match.home_team.code} size={16} />
+                </span>
                 <span className="text-sm font-semibold text-center leading-tight">
                   {match.home_team.name}
                 </span>
@@ -171,7 +174,9 @@ export default function PredictionModal({ match, onClose, onSaved }: Props) {
 
               {/* Away team */}
               <div className="flex flex-col items-center gap-3 flex-1">
-                <span className="text-2xl">{getFlag(match.away_team.code)}</span>
+                <span className="text-2xl">
+                <FlagImage code={match.away_team.code} size={16} />
+                </span>
                 <span className="text-sm font-semibold text-center leading-tight">
                   {match.away_team.name}
                 </span>

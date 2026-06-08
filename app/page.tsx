@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import Navbar from '@/app/components/Navbar'
+import FlagImage from '@/app/components/FlagImage'
 import { TOURNAMENT_ID } from '@/lib/constants'
 import { getFlag } from '@/lib/flags'
 
@@ -379,7 +380,7 @@ export default function Home() {
                       />
                       {selectedTeam && (
                         <span className="absolute right-3 top-2.5 text-sm">
-                          {getFlag(selectedTeam.code)}
+                          <FlagImage code={selectedTeam.code} size={16} />
                         </span>
                       )}
                       {showTeamDropdown && teamSearch && !isBonusLocked() && (
