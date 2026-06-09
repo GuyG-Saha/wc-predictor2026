@@ -19,3 +19,18 @@ export const formatMatchDay = (utcString: string) =>
     month: '2-digit',
     year: 'numeric',
   })
+
+export const formatDate = (utcString: string) =>
+  new Date(utcString + 'Z').toLocaleDateString('he-IL', {
+    timeZone: 'Asia/Jerusalem',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+
+export const formatTime = (utcString: string) =>
+  new Date(utcString + 'Z').toLocaleTimeString('he-IL', {
+    timeZone: 'Asia/Jerusalem',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
