@@ -33,6 +33,10 @@ export default function Navbar({ email }: NavbarProps) {
             Leaderboard
           </Link>
 
+          <Link href="/chat" className="hover:underline">
+            Chat
+          </Link>
+
           <Link href="/admin" className="hover:underline">
             Admin
           </Link>
