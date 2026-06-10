@@ -13,7 +13,7 @@ type Message = {
   user_id: string
   users: {
     display_name: string
-  }
+  } | null 
 }
 
 type Group = {
@@ -224,7 +224,7 @@ export default function ChatPage() {
                       >
                         {!isOwn && (
                           <span className="text-xs text-gray-400 mb-1 ml-1">
-                            {msg.users.display_name}
+                            {msg.users?.display_name ?? 'Unknown'}
                           </span>
                         )}
                         <div
