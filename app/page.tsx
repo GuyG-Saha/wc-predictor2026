@@ -6,12 +6,20 @@ import { supabase } from '@/lib/supabase'
 import Navbar from '@/app/components/Navbar'
 import FlagImage from '@/app/components/FlagImage'
 import { TOURNAMENT_ID } from '@/lib/constants'
-import { getFlag } from '@/lib/flags'
 
 type Team = {
   id: string
   name: string
   code: string
+}
+
+type Candidate = {
+  id: string
+  name: string
+  team_id: string
+  teams: {
+    code: string
+  }
 }
 
 type BonusPrediction = {
@@ -34,6 +42,7 @@ export default function Home() {
 
   // Bonus predictions state
   const [teams, setTeams] = useState<Team[]>([])
+  const [candidates, setCandidates] = useState<Candidate[]>([])
   const [bonus, setBonus] = useState<BonusPrediction>({
     predicted_winner_team_id: null,
     predicted_top_scorer: null,
@@ -42,6 +51,8 @@ export default function Home() {
   const [teamSearch, setTeamSearch] = useState('')
   const [showTeamDropdown, setShowTeamDropdown] = useState(false)
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null)
+  const [scorerSearch, setScorerSearch] = useState('')
+  const [showScorerDropdown, setShowScorerDropdown] = useState(false)
   const [bonusSaving, setBonusSaving] = useState(false)
   const [bonusSaved, setBonusSaved] = useState(false)
   const [bonusError, setBonusError] = useState<string | null>(null)
@@ -93,6 +104,7 @@ export default function Home() {
       { data: teamsData },
       { data: tournamentData },
       { data: bonusData },
+      { data: candidatesData },
     ] = await Promise.all([
       supabase.from('teams').select('id, name, code').order('name'),
       supabase
@@ -105,10 +117,16 @@ export default function Home() {
         .select('predicted_winner_team_id, predicted_top_scorer')
         .eq('user_id', user.id)
         .maybeSingle(),
+      supabase
+        .from('top_scorer_candidates')
+        .select('id, name, team_id, teams(code)')
+        .eq('tournament_id', TOURNAMENT_ID)
+        .order('name'),
     ])
 
     setTeams(teamsData || [])
     setTournament(tournamentData)
+    setCandidates((candidatesData as unknown as Candidate[]) || [])
 
     if (bonusData) {
       setBonus(bonusData)
@@ -120,6 +138,9 @@ export default function Home() {
           setSelectedTeam(team)
           setTeamSearch(team.name)
         }
+      }
+      if (bonusData.predicted_top_scorer) {
+        setScorerSearch(bonusData.predicted_top_scorer)
       }
     }
     setBonusLoading(false)
@@ -142,11 +163,21 @@ export default function Home() {
     t.name.toLowerCase().includes(teamSearch.toLowerCase())
   )
 
+  const filteredCandidates = candidates.filter((c) =>
+    c.name.toLowerCase().includes(scorerSearch.toLowerCase())
+  )
+
   const handleTeamSelect = (team: Team) => {
     setSelectedTeam(team)
     setTeamSearch(team.name)
     setBonus((prev) => ({ ...prev, predicted_winner_team_id: team.id }))
     setShowTeamDropdown(false)
+  }
+
+  const handleScorerSelect = (candidate: Candidate) => {
+    setScorerSearch(candidate.name)
+    setBonus((prev) => ({ ...prev, predicted_top_scorer: candidate.name }))
+    setShowScorerDropdown(false)
   }
 
   const handleSaveBonus = async () => {
@@ -180,7 +211,6 @@ export default function Home() {
     setJoinError(null)
     setJoinSuccess(null)
 
-    // Look up group by invite code
     const { data: group, error: groupError } = await supabase
       .from('groups')
       .select('id, name')
@@ -194,7 +224,6 @@ export default function Home() {
       return
     }
 
-    // Check if already a member
     const alreadyMember = userGroups.some((g) => g.id === group.id)
     if (alreadyMember) {
       setJoinError(`You are already in the "${group.name}" group.`)
@@ -202,7 +231,6 @@ export default function Home() {
       return
     }
 
-    // Join the group
     const { error: joinError } = await supabase
       .from('group_members')
       .insert({ group_id: group.id, user_id: user.id })
@@ -283,8 +311,6 @@ export default function Home() {
             {/* Groups */}
             <div className="border rounded-xl p-5">
               <h2 className="font-bold text-lg mb-1">Your Groups</h2>
-
-              {/* Current groups */}
               {userGroups.length > 0 ? (
                 <div className="flex flex-wrap gap-2 mb-4">
                   {userGroups.map((g) => (
@@ -301,8 +327,6 @@ export default function Home() {
                   You are not in any group yet. Enter an invite code to join one.
                 </p>
               )}
-
-              {/* Join group */}
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -322,13 +346,8 @@ export default function Home() {
                   {joining ? 'Joining…' : 'Join'}
                 </button>
               </div>
-
-              {joinError && (
-                <p className="text-red-500 text-xs mt-2">{joinError}</p>
-              )}
-              {joinSuccess && (
-                <p className="text-green-600 text-xs mt-2">{joinSuccess}</p>
-              )}
+              {joinError && <p className="text-red-500 text-xs mt-2">{joinError}</p>}
+              {joinSuccess && <p className="text-green-600 text-xs mt-2">{joinSuccess}</p>}
             </div>
 
             {/* Bonus Predictions */}
@@ -395,7 +414,7 @@ export default function Home() {
                                 onClick={() => handleTeamSelect(team)}
                                 className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
                               >
-                                <span>{getFlag(team.code)}</span>
+                                <FlagImage code={team.code} size={16} />
                                 <span>{team.name}</span>
                               </button>
                             ))
@@ -410,17 +429,43 @@ export default function Home() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       ⚽ Top Scorer
                     </label>
-                    <input
-                      type="text"
-                      value={bonus.predicted_top_scorer || ''}
-                      onChange={(e) =>
-                        setBonus((prev) => ({ ...prev, predicted_top_scorer: e.target.value }))
-                      }
-                      disabled={isBonusLocked()}
-                      placeholder="e.g. Mbappe"
-                      className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none
-                        focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={scorerSearch}
+                        onChange={(e) => {
+                          setScorerSearch(e.target.value)
+                          setShowScorerDropdown(true)
+                          if (!e.target.value) {
+                            setBonus((prev) => ({ ...prev, predicted_top_scorer: null }))
+                          }
+                        }}
+                        onFocus={() => setShowScorerDropdown(true)}
+                        disabled={isBonusLocked()}
+                        placeholder="Search for a player..."
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none
+                          focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      />
+                      {showScorerDropdown && scorerSearch && !isBonusLocked() && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                          {filteredCandidates.length === 0 ? (
+                            <div className="px-3 py-2 text-sm text-gray-400">No players found</div>
+                          ) : (
+                            filteredCandidates.map((candidate) => (
+                              <button
+                                key={candidate.id}
+                                type="button"
+                                onClick={() => handleScorerSelect(candidate)}
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
+                              >
+                                <FlagImage code={candidate.teams.code} size={16} />
+                                <span>{candidate.name}</span>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {bonusError && (
