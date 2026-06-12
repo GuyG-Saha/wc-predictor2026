@@ -83,25 +83,24 @@ export default function UserPredictionsPage() {
       const { data, error } = await supabase
         .from('predictions')
         .select(`
-          match_id,
-          predicted_home_score,
-          predicted_away_score,
-          matches!inner(
-            id,
-            start_time,
-            stage,
-            group_name,
-            home_score,
-            away_score,
-            is_finished,
-            home_team:teams!home_team_id(name, code),
-            away_team:teams!away_team_id(name, code)
-          )
-        `)
-        .eq('user_id', userId)
-        .eq('matches.tournament_id', TOURNAMENT_ID)
-        .lt('matches.start_time', new Date().toISOString())
-        .order('matches.start_time', { ascending: true })
+        match_id,
+        predicted_home_score,
+        predicted_away_score,
+        matches!inner(
+        id,
+        start_time,
+        stage,
+        group_name,
+        home_score,
+        away_score,
+        is_finished,
+        home_team:teams!home_team_id(name, code),
+        away_team:teams!away_team_id(name, code)
+        )
+    `)
+  .eq('user_id', userId)
+  .lt('matches.start_time', new Date().toISOString())
+  .order('matches.start_time', { ascending: true })
 
       if (!error) setPredictions((data as unknown as PredictionRow[]) || [])
       setLoading(false)
