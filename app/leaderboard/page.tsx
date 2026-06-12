@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Navbar from '../components/Navbar'
 import { TOURNAMENT_ID } from '@/lib/constants'
+import { useRouter } from 'next/navigation'
+
 
 type LeaderboardEntry = {
   user_id: string
@@ -31,6 +33,7 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true)
   const [groupsLoading, setGroupsLoading] = useState(true)
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
+  const router = useRouter()
 
   // Load user's groups on mount
   useEffect(() => {
@@ -149,12 +152,13 @@ export default function LeaderboardPage() {
                   return (
                     <div
                       key={entry.user_id}
-                      className={`flex items-center gap-4 p-4 rounded-xl border transition
-                        ${rank <= 3
-                          ? 'bg-white shadow-sm font-medium'
-                          : 'bg-white hover:shadow-sm'
-                        }`}
-                    >
+                      onClick={() => router.push(`/predictions/${entry.user_id}`)}
+                      className={`flex items-center gap-4 p-4 rounded-xl border transition cursor-pointer
+                      ${rank <= 3
+                        ? 'bg-white shadow-sm font-medium hover:shadow-md'
+                        : 'bg-white hover:shadow-sm'
+                      }`}
+>
                       {/* Rank */}
                       <div className="w-8 text-center">
                         {medal ? (
