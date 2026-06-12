@@ -100,10 +100,16 @@ export default function UserPredictionsPage() {
     `)
   .eq('user_id', userId)
   .lt('matches.start_time', new Date().toISOString())
-  .order('matches.start_time', { ascending: true })
 
-      if (!error) setPredictions((data as unknown as PredictionRow[]) || [])
-      setLoading(false)
+if (!error) {
+  const sorted = ((data as unknown as PredictionRow[]) || [])
+    .sort((a, b) => 
+      new Date(a.matches.start_time).getTime() - 
+      new Date(b.matches.start_time).getTime()
+    )
+    setPredictions(sorted)
+    }      
+    setLoading(false)
     }
     load()
   }, [userId])
