@@ -33,6 +33,7 @@ const ESPN_NAME_MAP: Record<string, string> = {
   'USA': 'United States',
   'Germany': 'Germany',
   'Curacao': 'Curacao',
+  'Curaçao': 'Curacao',
   'Netherlands': 'Netherlands',
   'Japan': 'Japan',
   'Ivory Coast': 'Ivory Coast',
