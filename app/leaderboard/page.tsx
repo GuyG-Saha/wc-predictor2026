@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Navbar from '../components/Navbar'
+import FlagImage from '../components/FlagImage'
 import { TOURNAMENT_ID } from '@/lib/constants'
-import { useRouter } from 'next/navigation'
-
 
 type LeaderboardEntry = {
   user_id: string
@@ -19,6 +19,15 @@ type Group = {
   name: string
 }
 
+type BonusEntry = {
+  user_id: string
+  display_name: string
+  predicted_winner_team_id: string | null
+  predicted_top_scorer: string | null
+  team_name: string | null
+  team_code: string | null
+}
+
 const getMedal = (rank: number) => {
   if (rank === 1) return '🥇'
   if (rank === 2) return '🥈'
@@ -27,15 +36,19 @@ const getMedal = (rank: number) => {
 }
 
 export default function LeaderboardPage() {
+  const router = useRouter()
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
   const [groups, setGroups] = useState<Group[]>([])
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [groupsLoading, setGroupsLoading] = useState(true)
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
-  const router = useRouter()
 
-  // Load user's groups on mount
+  // Bonus predictions state
+  const [showBonus, setShowBonus] = useState(false)
+  const [bonusEntries, setBonusEntries] = useState<BonusEntry[]>([])
+  const [bonusLoading, setBonusLoading] = useState(false)
+
   useEffect(() => {
     const loadGroups = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -60,10 +73,10 @@ export default function LeaderboardPage() {
     loadGroups()
   }, [])
 
-  // Load leaderboard when selected group changes
   useEffect(() => {
     if (!selectedGroupId) return
     loadLeaderboard()
+    setShowBonus(false) // collapse bonus section when switching groups
   }, [selectedGroupId])
 
   const loadLeaderboard = async () => {
@@ -82,6 +95,50 @@ export default function LeaderboardPage() {
     setLoading(false)
   }
 
+  const loadBonusPredictions = async () => {
+    if (!selectedGroupId || bonusEntries.length > 0) return
+    setBonusLoading(true)
+
+    // Get group member user IDs
+    const { data: memberData } = await supabase
+      .from('group_members')
+      .select('user_id')
+      .eq('group_id', selectedGroupId)
+
+    const userIds = (memberData || []).map((m) => m.user_id)
+    if (userIds.length === 0) { setBonusLoading(false); return }
+
+    // Get their bonus predictions + display names + team info
+    const { data, error } = await supabase
+      .from('bonus_predictions')
+      .select(`
+        user_id,
+        predicted_winner_team_id,
+        predicted_top_scorer,
+        users(display_name),
+        teams(name, code)
+      `)
+      .in('user_id', userIds)
+
+    if (!error && data) {
+      const mapped: BonusEntry[] = (data as any[]).map((row) => ({
+        user_id: row.user_id,
+        display_name: row.users?.display_name ?? 'Unknown',
+        predicted_winner_team_id: row.predicted_winner_team_id,
+        predicted_top_scorer: row.predicted_top_scorer,
+        team_name: row.teams?.name ?? null,
+        team_code: row.teams?.code ?? null,
+      }))
+      setBonusEntries(mapped)
+    }
+    setBonusLoading(false)
+  }
+
+  const handleToggleBonus = () => {
+    if (!showBonus) loadBonusPredictions()
+    setShowBonus((prev) => !prev)
+  }
+
   return (
     <>
       <Navbar />
@@ -98,7 +155,6 @@ export default function LeaderboardPage() {
           </button>
         </div>
 
-        {/* Group selector */}
         {groupsLoading ? (
           <div className="h-10 bg-gray-100 rounded-lg animate-pulse mb-5" />
         ) : groups.length === 0 ? (
@@ -125,7 +181,6 @@ export default function LeaderboardPage() {
               </div>
             )}
 
-            {/* Last refreshed */}
             {lastRefreshed && (
               <p className="text-xs text-gray-400 mb-4">
                 Last updated: {lastRefreshed.toLocaleTimeString('he-IL', {
@@ -145,7 +200,7 @@ export default function LeaderboardPage() {
                 No participants in this group yet.
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2 mb-6">
                 {entries.map((entry, index) => {
                   const rank = index + 1
                   const medal = getMedal(rank)
@@ -154,30 +209,22 @@ export default function LeaderboardPage() {
                       key={entry.user_id}
                       onClick={() => router.push(`/predictions/${entry.user_id}`)}
                       className={`flex items-center gap-4 p-4 rounded-xl border transition cursor-pointer
-                      ${rank <= 3
-                        ? 'bg-white shadow-sm font-medium hover:shadow-md'
-                        : 'bg-white hover:shadow-sm'
-                      }`}
->
-                      {/* Rank */}
+                        ${rank <= 3
+                          ? 'bg-white shadow-sm font-medium hover:shadow-md'
+                          : 'bg-white hover:shadow-sm'
+                        }`}
+                    >
                       <div className="w-8 text-center">
                         {medal ? (
                           <span className="text-xl">{medal}</span>
                         ) : (
-                          <span className="text-sm text-gray-400 font-mono">
-                            {rank}
-                          </span>
+                          <span className="text-sm text-gray-400 font-mono">{rank}</span>
                         )}
                       </div>
-                      {/* Name */}
-                      <div className="flex-1 text-sm md:text-base">
-                        {entry.display_name}
-                      </div>
-                      {/* Prediction count */}
+                      <div className="flex-1 text-sm md:text-base">{entry.display_name}</div>
                       <div className="text-xs text-gray-400 hidden sm:block">
                         {entry.prediction_count} prediction{entry.prediction_count !== 1 ? 's' : ''}
                       </div>
-                      {/* Score */}
                       <div className={`text-lg font-bold min-w-[3rem] text-right
                         ${rank === 1 ? 'text-yellow-500' : 'text-gray-800'}`}
                       >
@@ -188,6 +235,56 @@ export default function LeaderboardPage() {
                 })}
               </div>
             )}
+
+            {/* Bonus predictions expandable section */}
+            <div className="border rounded-xl overflow-hidden">
+              <button
+                onClick={handleToggleBonus}
+                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition"
+              >
+                <span className="font-semibold text-sm flex items-center gap-2">
+                  🎯 Bonus Predictions
+                </span>
+                <span className="text-gray-400 text-sm">{showBonus ? '▲' : '▼'}</span>
+              </button>
+
+              {showBonus && (
+                <div className="border-t divide-y">
+                  {bonusLoading ? (
+                    <div className="flex justify-center py-6">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900" />
+                    </div>
+                  ) : bonusEntries.length === 0 ? (
+                    <p className="text-sm text-gray-400 px-4 py-4">
+                      No one has submitted bonus predictions yet.
+                    </p>
+                  ) : (
+                    bonusEntries.map((entry) => (
+                      <div key={entry.user_id} className="flex items-center justify-between px-4 py-3">
+                        <span className="text-sm font-medium">{entry.display_name}</span>
+                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-gray-400">🏆</span>
+                            {entry.team_code ? (
+                              <>
+                                <FlagImage code={entry.team_code} size={14} />
+                                <span>{entry.team_name}</span>
+                              </>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-gray-400">⚽</span>
+                            <span>{entry.predicted_top_scorer || '—'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </>
         )}
       </main>
