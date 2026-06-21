@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { ESPN_NAME_MAP } from '@/lib/espn-team-map'
+
 
 // Use service role key to bypass RLS for server-side updates
 const supabase = createClient(
@@ -8,65 +10,6 @@ const supabase = createClient(
 )
 
 const ESPN_URL = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard'
-
-// Maps ESPN team names to your DB team names
-const ESPN_NAME_MAP: Record<string, string> = {
-  'Mexico': 'Mexico',
-  'South Africa': 'South Africa',
-  'South Korea': 'South Korea',
-  'Czech Republic': 'Czechia',
-  'Canada': 'Canada',
-  'Bosnia and Herzegovina': 'Bosnia and Herzegovina',
-  'Qatar': 'Qatar',
-  'Switzerland': 'Switzerland',
-  'Brazil': 'Brazil',
-  'Morocco': 'Morocco',
-  'Haiti': 'Haiti',
-  'Scotland': 'Scotland',
-  'United States': 'United States',
-  'Paraguay': 'Paraguay',
-  'Australia': 'Australia',
-  'Turkey': 'Turkey',
-  'Türkiye': 'Turkey',
-  'IR Iran': 'Iran',
-  'Korea Republic': 'South Korea',
-  'USA': 'United States',
-  'Germany': 'Germany',
-  'Curacao': 'Curacao',
-  'Curaçao': 'Curacao',
-  'Congo DR': 'DR Congo',
-  'Netherlands': 'Netherlands',
-  'Japan': 'Japan',
-  'Ivory Coast': 'Ivory Coast',
-  "Côte d'Ivoire": 'Ivory Coast',
-  'Ecuador': 'Ecuador',
-  'Sweden': 'Sweden',
-  'Tunisia': 'Tunisia',
-  'Spain': 'Spain',
-  'Cape Verde': 'Cape Verde',
-  'Belgium': 'Belgium',
-  'Egypt': 'Egypt',
-  'Saudi Arabia': 'Saudi Arabia',
-  'Uruguay': 'Uruguay',
-  'Iran': 'Iran',
-  'New Zealand': 'New Zealand',
-  'France': 'France',
-  'Senegal': 'Senegal',
-  'Iraq': 'Iraq',
-  'Norway': 'Norway',
-  'Argentina': 'Argentina',
-  'Algeria': 'Algeria',
-  'Austria': 'Austria',
-  'Jordan': 'Jordan',
-  'Portugal': 'Portugal',
-  'DR Congo': 'DR Congo',
-  'Uzbekistan': 'Uzbekistan',
-  'Colombia': 'Colombia',
-  'England': 'England',
-  'Croatia': 'Croatia',
-  'Ghana': 'Ghana',
-  'Panama': 'Panama',
-}
 
 export async function GET(request: Request) {
   // Verify cron secret to prevent unauthorized calls
