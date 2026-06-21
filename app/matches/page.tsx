@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { TOURNAMENT_ID } from '@/lib/constants'
 import Navbar from '../components/Navbar'
@@ -10,6 +10,17 @@ import { formatStage, formatKickoff } from '@/lib/utils'
 import FlagImage from '@/app/components/FlagImage'
 
 type Tab = 'upcoming' | 'finished' | 'all'
+
+type LiveMatchData = {
+  homeTeam: string
+  awayTeam: string
+  homeScore: number
+  awayScore: number
+  state: 'pre' | 'in' | 'post'
+  clock: string | null
+}
+
+const LIVE_POLL_INTERVAL_MS = 60_000 // 60 seconds
 
 function TabButton({
   label,
@@ -43,19 +54,12 @@ function TabButton({
   )
 }
 
-// Derives current stage and matchday from all matches
 function getTournamentContext(matches: Match[]): string | null {
   if (matches.length === 0) return null
-
   const now = new Date()
-
-  // Find matches that have started (past kickoff) — these define current stage
-  const startedMatches = matches.filter(
-    (m) => new Date(m.start_time + 'Z') <= now
-  )
+  const startedMatches = matches.filter((m) => new Date(m.start_time + 'Z') <= now)
 
   if (startedMatches.length === 0) {
-    // Tournament hasn't started yet
     const first = matches[0]
     const kickoff = new Date(first.start_time + 'Z').toLocaleDateString('he-IL', {
       timeZone: 'Asia/Jerusalem',
@@ -65,38 +69,35 @@ function getTournamentContext(matches: Match[]): string | null {
     return `⏳ Tournament starts ${kickoff}`
   }
 
-  // Get the most recent started match to determine current stage
   const latest = startedMatches[startedMatches.length - 1]
   const stage = formatStage(latest.stage)
 
-  // For group stage, calculate matchday
   if (latest.stage === 'group') {
-    // Group matchdays: each unique date batch of group matches
     const groupMatches = matches.filter((m) => m.stage === 'group')
     const uniqueDates = [
       ...new Set(
-        groupMatches.map((m) =>
-          new Date(m.start_time + 'Z').toISOString().split('T')[0]
-        )
+        groupMatches.map((m) => new Date(m.start_time + 'Z').toISOString().split('T')[0])
       ),
     ].sort()
-
-    const startedDates = uniqueDates.filter(
-      (d) => new Date(d + 'T00:00:00Z') <= now
-    )
-
-    // Matchday is determined by which third of group matches we're in
+    const startedDates = uniqueDates.filter((d) => new Date(d + 'T00:00:00Z') <= now)
     const matchday =
       startedDates.length <= uniqueDates.length / 3
         ? 1
         : startedDates.length <= (uniqueDates.length * 2) / 3
         ? 2
         : 3
-
     return `📍 ${stage} • Matchday ${matchday}`
   }
 
   return `📍 ${stage}`
+}
+
+// Determines if a match could plausibly be live right now (kickoff to kickoff+2.5h)
+function isWithinLiveWindow(startTime: string): boolean {
+  const kickoff = new Date(startTime + 'Z').getTime()
+  const now = Date.now()
+  const windowEnd = kickoff + 2.5 * 60 * 60 * 1000 // 2.5 hours
+  return now >= kickoff && now <= windowEnd
 }
 
 export default function MatchesPage() {
@@ -105,6 +106,8 @@ export default function MatchesPage() {
   const [loading, setLoading] = useState(true)
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('upcoming')
+  const [liveData, setLiveData] = useState<Record<string, LiveMatchData>>({})
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     const loadData = async () => {
@@ -155,8 +158,44 @@ export default function MatchesPage() {
     loadData()
   }, [])
 
+  // Poll live scores only if there are matches currently in their live window
+  useEffect(() => {
+    const hasLiveCandidate = matches.some(
+      (m) => !m.is_finished && isWithinLiveWindow(m.start_time)
+    )
+
+    const fetchLive = async () => {
+      try {
+        const res = await fetch('/api/live-scores')
+        const data = await res.json()
+        const map: Record<string, LiveMatchData> = {}
+        ;(data.matches || []).forEach((lm: LiveMatchData) => {
+          const key = `${lm.homeTeam}__${lm.awayTeam}`
+          map[key] = lm
+        })
+        setLiveData(map)
+      } catch (err) {
+        // Silent fail — live data is a nice-to-have, not critical
+      }
+    }
+
+    if (hasLiveCandidate) {
+      fetchLive() // immediate fetch
+      pollRef.current = setInterval(fetchLive, LIVE_POLL_INTERVAL_MS)
+    }
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+    }
+  }, [matches])
+
   const handlePredictionSaved = (matchId: string, home: number, away: number) => {
     setPredictions((prev) => ({ ...prev, [matchId]: { home, away } }))
+  }
+
+  const getLiveInfo = (match: Match): LiveMatchData | null => {
+    const key = `${match.home_team.name}__${match.away_team.name}`
+    return liveData[key] ?? null
   }
 
   const upcomingMatches = matches.filter((m) => !m.is_finished)
@@ -182,10 +221,7 @@ export default function MatchesPage() {
       )}
       <main className="min-h-screen p-4 md:p-8 max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl md:text-4xl font-bold">
-            World Cup 2026
-          </h1>
-          {/* Tournament context banner */}
+          <h1 className="text-3xl md:text-4xl font-bold">World Cup 2026</h1>
           {!loading && tournamentContext && (
             <span className="text-xs font-medium bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-full whitespace-nowrap">
               {tournamentContext}
@@ -221,63 +257,77 @@ export default function MatchesPage() {
           </div>
         ) : visibleMatches.length === 0 ? (
           <div className="text-center py-20 text-gray-400">
-            {activeTab === 'finished'
-              ? 'No matches have been played yet.'
-              : 'No upcoming matches.'}
+            {activeTab === 'finished' ? 'No matches have been played yet.' : 'No upcoming matches.'}
           </div>
         ) : (
           <div className="space-y-3">
-            {visibleMatches.map((match) => (
-              <div
-                key={match.id}
-                className="border rounded-lg p-4 shadow-sm hover:shadow-md transition bg-white"
-              >
-                {/* Teams row */}
-                <div className="flex justify-between items-center mb-2">
-                  <div className="flex-1 text-right font-semibold text-base md:text-lg">
-                    <FlagImage code={match.home_team.code} /> {match.home_team.name}
-                  </div>
-                  <div className="px-3 text-gray-400 font-bold text-sm">
-                    VS
-                  </div>
-                  <div className="flex-1 font-semibold text-base md:text-lg">
-                    <FlagImage code={match.away_team.code} /> {match.away_team.name}
-                  </div>
-                </div>
+            {visibleMatches.map((match) => {
+              const live = !match.is_finished ? getLiveInfo(match) : null
+              const isLive = live?.state === 'in'
 
-                {/* Stage + group */}
-                <div className="text-center text-xs text-gray-500 mb-3">
-                  {formatStage(match.stage)}
-                  {match.group_name ? ` • Group ${match.group_name}` : ''}
-                </div>
-
-                {/* Kickoff + score/predict */}
-                <div className="flex justify-between items-center">
-                  <div className="text-xs text-gray-400">
-                    {formatKickoff(match.start_time)}
-                  </div>
-                  {match.is_finished ? (
-                    <div className="text-lg font-bold">
-                      {match.home_score} – {match.away_score}
+              return (
+                <div
+                  key={match.id}
+                  className={`border rounded-lg p-4 shadow-sm hover:shadow-md transition bg-white
+                    ${isLive ? 'ring-2 ring-red-200' : ''}`}
+                >
+                  {/* Teams row */}
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="flex-1 text-right font-semibold text-base md:text-lg">
+                      <FlagImage code={match.home_team.code} /> {match.home_team.name}
                     </div>
-                  ) : predictions[match.id] ? (
-                    <button
-                      onClick={() => setSelectedMatch(match)}
-                      className="border border-blue-400 text-blue-600 px-3 py-1 rounded hover:bg-blue-50 text-sm font-medium transition"
-                    >
-                      {predictions[match.id].home} – {predictions[match.id].away} ✓
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setSelectedMatch(match)}
-                      className="border px-3 py-1 rounded hover:bg-gray-100 text-sm transition"
-                    >
-                      Predict
-                    </button>
-                  )}
+                    <div className="px-3 text-gray-400 font-bold text-sm">VS</div>
+                    <div className="flex-1 font-semibold text-base md:text-lg">
+                      <FlagImage code={match.away_team.code} /> {match.away_team.name}
+                    </div>
+                  </div>
+
+                  {/* Stage + group + live badge */}
+                  <div className="flex items-center justify-center gap-2 text-center text-xs text-gray-500 mb-3">
+                    <span>
+                      {formatStage(match.stage)}
+                      {match.group_name ? ` • Group ${match.group_name}` : ''}
+                    </span>
+                    {isLive && (
+                      <span className="flex items-center gap-1 text-red-500 font-semibold">
+                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+                        LIVE {live?.clock}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Kickoff + score/predict */}
+                  <div className="flex justify-between items-center">
+                    <div className="text-xs text-gray-400">
+                      {formatKickoff(match.start_time)}
+                    </div>
+                    {match.is_finished ? (
+                      <div className="text-lg font-bold">
+                        {match.home_score} – {match.away_score}
+                      </div>
+                    ) : isLive ? (
+                      <div className="text-lg font-bold text-red-600">
+                        {live!.homeScore} – {live!.awayScore}
+                      </div>
+                    ) : predictions[match.id] ? (
+                      <button
+                        onClick={() => setSelectedMatch(match)}
+                        className="border border-blue-400 text-blue-600 px-3 py-1 rounded hover:bg-blue-50 text-sm font-medium transition"
+                      >
+                        {predictions[match.id].home} – {predictions[match.id].away} ✓
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setSelectedMatch(match)}
+                        className="border px-3 py-1 rounded hover:bg-gray-100 text-sm transition"
+                      >
+                        Predict
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </main>
