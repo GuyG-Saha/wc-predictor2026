@@ -9,8 +9,6 @@ import { Match, UserPrediction } from '@/lib/types'
 import { formatStage, formatKickoff } from '@/lib/utils'
 import FlagImage from '@/app/components/FlagImage'
 
-type Tab = 'upcoming' | 'finished' | 'all'
-
 type LiveMatchData = {
   homeTeam: string
   awayTeam: string
@@ -20,38 +18,16 @@ type LiveMatchData = {
   clock: string | null
 }
 
-const LIVE_POLL_INTERVAL_MS = 60_000 // 60 seconds
+const LIVE_POLL_INTERVAL_MS = 60_000
 
-function TabButton({
-  label,
-  count,
-  active,
-  onClick,
-}: {
-  label: string
-  count: number
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex-1 py-2 text-sm font-medium rounded-lg transition ${
-        active
-          ? 'bg-black text-white'
-          : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'
-      }`}
-    >
-      {label}
-      <span
-        className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${
-          active ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
-        }`}
-      >
-        {count}
-      </span>
-    </button>
-  )
+// Canonical stage order for sorting tabs
+const STAGE_ORDER: Record<string, number> = {
+  group: 0,
+  round_of_32: 1,
+  round_of_16: 2,
+  quarter_final: 3,
+  semi_final: 4,
+  final: 5,
 }
 
 function getTournamentContext(matches: Match[]): string | null {
@@ -92,12 +68,18 @@ function getTournamentContext(matches: Match[]): string | null {
   return `📍 ${stage}`
 }
 
-// Determines if a match could plausibly be live right now (kickoff to kickoff+2.5h)
 function isWithinLiveWindow(startTime: string): boolean {
   const kickoff = new Date(startTime + 'Z').getTime()
   const now = Date.now()
-  const windowEnd = kickoff + 2.5 * 60 * 60 * 1000 // 2.5 hours
-  return now >= kickoff && now <= windowEnd
+  return now >= kickoff && now <= kickoff + 2.5 * 60 * 60 * 1000
+}
+
+// Derive active stage — the stage with the most recent started match
+function getActiveStage(matches: Match[]): string {
+  const now = new Date()
+  const started = matches.filter((m) => new Date(m.start_time + 'Z') <= now)
+  if (started.length === 0) return matches[0]?.stage ?? 'group'
+  return started[started.length - 1].stage
 }
 
 export default function MatchesPage() {
@@ -105,7 +87,7 @@ export default function MatchesPage() {
   const [predictions, setPredictions] = useState<Record<string, UserPrediction>>({})
   const [loading, setLoading] = useState(true)
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
-  const [activeTab, setActiveTab] = useState<Tab>('upcoming')
+  const [activeStage, setActiveStage] = useState<string>('group')
   const [liveData, setLiveData] = useState<Record<string, LiveMatchData>>({})
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -133,7 +115,9 @@ export default function MatchesPage() {
         return
       }
 
-      setMatches((matchesData as unknown as Match[]) || [])
+      const loaded = (matchesData as unknown as Match[]) || []
+      setMatches(loaded)
+      setActiveStage(getActiveStage(loaded))
 
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
@@ -158,7 +142,6 @@ export default function MatchesPage() {
     loadData()
   }, [])
 
-  // Poll live scores only if there are matches currently in their live window
   useEffect(() => {
     const hasLiveCandidate = matches.some(
       (m) => !m.is_finished && isWithinLiveWindow(m.start_time)
@@ -175,12 +158,12 @@ export default function MatchesPage() {
         })
         setLiveData(map)
       } catch (err) {
-        // Silent fail — live data is a nice-to-have, not critical
+        // Silent fail
       }
     }
 
     if (hasLiveCandidate) {
-      fetchLive() // immediate fetch
+      fetchLive()
       pollRef.current = setInterval(fetchLive, LIVE_POLL_INTERVAL_MS)
     }
 
@@ -198,15 +181,12 @@ export default function MatchesPage() {
     return liveData[key] ?? null
   }
 
-  const upcomingMatches = matches.filter((m) => !m.is_finished)
-  const finishedMatches = matches.filter((m) => m.is_finished)
-  const visibleMatches =
-    activeTab === 'upcoming'
-      ? upcomingMatches
-      : activeTab === 'finished'
-      ? finishedMatches
-      : matches
+  // Derive unique stages present in DB, sorted by tournament order
+  const stages = [...new Set(matches.map((m) => m.stage))].sort(
+    (a, b) => (STAGE_ORDER[a] ?? 99) - (STAGE_ORDER[b] ?? 99)
+  )
 
+  const visibleMatches = matches.filter((m) => m.stage === activeStage)
   const tournamentContext = getTournamentContext(matches)
 
   return (
@@ -229,27 +209,35 @@ export default function MatchesPage() {
           )}
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 bg-gray-50 border rounded-xl p-1 mb-5">
-          <TabButton
-            label="Upcoming"
-            count={upcomingMatches.length}
-            active={activeTab === 'upcoming'}
-            onClick={() => setActiveTab('upcoming')}
-          />
-          <TabButton
-            label="Finished"
-            count={finishedMatches.length}
-            active={activeTab === 'finished'}
-            onClick={() => setActiveTab('finished')}
-          />
-          <TabButton
-            label="All"
-            count={matches.length}
-            active={activeTab === 'all'}
-            onClick={() => setActiveTab('all')}
-          />
-        </div>
+        {/* Stage tabs */}
+        {!loading && stages.length > 0 && (
+          <div className="flex gap-1 bg-gray-50 border rounded-xl p-1 mb-5 overflow-x-auto">
+            {stages.map((stage) => {
+              const count = matches.filter((m) => m.stage === stage).length
+              const active = activeStage === stage
+              return (
+                <button
+                  key={stage}
+                  onClick={() => setActiveStage(stage)}
+                  className={`flex-shrink-0 px-3 py-2 text-xs font-medium rounded-lg transition whitespace-nowrap ${
+                    active
+                      ? 'bg-black text-white'
+                      : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'
+                  }`}
+                >
+                  {formatStage(stage)}
+                  <span
+                    className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${
+                      active ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
 
         {loading ? (
           <div className="flex justify-center items-center py-20">
@@ -257,7 +245,7 @@ export default function MatchesPage() {
           </div>
         ) : visibleMatches.length === 0 ? (
           <div className="text-center py-20 text-gray-400">
-            {activeTab === 'finished' ? 'No matches have been played yet.' : 'No upcoming matches.'}
+            No matches in this stage yet.
           </div>
         ) : (
           <div className="space-y-3">
@@ -282,12 +270,9 @@ export default function MatchesPage() {
                     </div>
                   </div>
 
-                  {/* Stage + group + live badge */}
+                  {/* Group + live badge */}
                   <div className="flex items-center justify-center gap-2 text-center text-xs text-gray-500 mb-3">
-                    <span>
-                      {formatStage(match.stage)}
-                      {match.group_name ? ` • Group ${match.group_name}` : ''}
-                    </span>
+                    {match.group_name && <span>Group {match.group_name}</span>}
                     {isLive && (
                       <span className="flex items-center gap-1 text-red-500 font-semibold">
                         <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
