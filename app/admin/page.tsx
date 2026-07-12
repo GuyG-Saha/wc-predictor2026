@@ -5,8 +5,9 @@ import Navbar from '@/app/components/Navbar'
 import MatchResultsTab from './_components/MatchResultsTab'
 import UsersTab from './_components/UsersTab'
 import GroupsTab from './_components/GroupsTab'
+import ScoringRulesTab from './_components/ScoringRulesTab'
 
-type Tab = 'matches' | 'users' | 'groups'
+type Tab = 'matches' | 'users' | 'groups' | 'scoring'
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<Tab>('matches')
@@ -15,6 +16,7 @@ export default function AdminPage() {
     { key: 'matches', label: 'Match Results' },
     { key: 'users', label: 'Users' },
     { key: 'groups', label: 'Groups' },
+    { key: 'scoring', label: 'Scoring Rules' },
   ]
 
   return (
@@ -48,6 +50,7 @@ export default function AdminPage() {
         {activeTab === 'matches' && <MatchResultsTab />}
         {activeTab === 'users' && <UsersTab />}
         {activeTab === 'groups' && <GroupsTab />}
+        {activeTab === 'scoring' && <ScoringRulesTab />}
       </main>
     </>
   )
