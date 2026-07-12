@@ -6,8 +6,9 @@ import MatchResultsTab from './_components/MatchResultsTab'
 import UsersTab from './_components/UsersTab'
 import GroupsTab from './_components/GroupsTab'
 import ScoringRulesTab from './_components/ScoringRulesTab'
+import GoldenBootTab from './_components/GoldenBootTab'
 
-type Tab = 'matches' | 'users' | 'groups' | 'scoring'
+type Tab = 'matches' | 'users' | 'groups' | 'scoring' | 'golden_boot'
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<Tab>('matches')
@@ -17,6 +18,7 @@ export default function AdminPage() {
     { key: 'users', label: 'Users' },
     { key: 'groups', label: 'Groups' },
     { key: 'scoring', label: 'Scoring Rules' },
+    { key: 'golden_boot', label: 'Golden Boot' },
   ]
 
   return (
@@ -51,6 +53,7 @@ export default function AdminPage() {
         {activeTab === 'users' && <UsersTab />}
         {activeTab === 'groups' && <GroupsTab />}
         {activeTab === 'scoring' && <ScoringRulesTab />}
+        {activeTab === 'golden_boot' && <GoldenBootTab />}
       </main>
     </>
   )
