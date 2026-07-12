@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import Navbar from '@/app/components/Navbar'
 import FlagImage from '@/app/components/FlagImage'
 import { TOURNAMENT_ID } from '@/lib/constants'
+import GoldenBootStandings from '@/app/components/GoldenBootStandings'
 
 type Team = {
   id: string
@@ -492,6 +493,7 @@ export default function Home() {
             </div>
           </div>
         )}
+        <GoldenBootStandings />
       </main>
     </>
   )
