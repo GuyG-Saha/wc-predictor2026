@@ -491,9 +491,9 @@ export default function Home() {
                 </div>
               )}
             </div>
+            <GoldenBootStandings />
           </div>
         )}
-        <GoldenBootStandings />
       </main>
     </>
   )
